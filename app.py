@@ -13,15 +13,35 @@ engine = create_engine(url, pool_pre_ping=True)
 with engine.connect() as c:
     df = pd.read_sql(text("SELECT * FROM logs ORDER BY ts DESC LIMIT 100"), c)
 
-app = Dash(__name__)
+time = {
+    "1h": ("1 hour", 60, "1min"),
+    "3h": ("3 hours", 180, "3min"),
+    "24h": ("12 hours", 1440, "30min"),  
+}
 
-app.layout = html.Div([
-    html.H2("Conexion base de datos", className="title"),  
-    html.P(f"Total registros: {len(df)}", className="total"),
-    html.Div(
-        dash_table.DataTable(df.to_dict("records"), page_size=10), className="table-container"
-    ),
-])
+refresh = {"10s": 10_000, "60s": 60_000}
 
+all = "Todos"
+with engine.connect() as c:
+    service = [all] + [r[0] for r in c.execute(text("SELECT DISTINCT svc FROM logs ORDER BY 1"))]
+
+def selector(label, child):
+    return html.Div([html.Label(label), child], className="selector")
+
+app = Dash(__name__, title="logs")
+
+app.layout = html.Div(
+    [
+        html.H2("Logs"),
+        html.Div(
+            [
+                selector( "Servicio", dcc.Dropdown(service, all, id="svc", clearable=False)),
+                selector( "Ventana de tiempo", dcc.RadioItems(list(time), "1h", id="time", inline=True)),
+                selector( "Refrescar cada", dcc.RadioItems(list(refresh), "10s", id="refresh", inline=True)),
+            ],
+            className="selectors",
+        )
+    ]
+)
 if __name__ == "__main__":
     app.run(debug=True)
