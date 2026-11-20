@@ -16,7 +16,7 @@ with engine.connect() as c:
 time = {
     "1h": ("1 hour", 60, "1min"),
     "3h": ("3 hours", 180, "3min"),
-    "24h": ("12 hours", 1440, "30min"),  
+    "24h": ("24 hours", 1440, "30min"),  
 }
 
 refresh = {"10s": 10_000, "60s": 60_000}
@@ -56,7 +56,9 @@ app.layout = html.Div(
                 kpi("5xx", "Errores 5xx"),
             ],
             className="kpis",
-        )
+        ),
+        dcc.Graph(id="prm-graph"),
+        dcc.Graph(id="errors-graph"),
     ]
 )
 
@@ -69,15 +71,34 @@ def load(time_value, svc_value):
     with engine.connect() as c:
         return pd.read_sql(text(sql), c, params=valores)
 
+
 @app.callback(
     Output("avg", "children"), Output("p95", "children"), Output("p99", "children"), Output("rpm", "children"),
-    Output("4xx", "children"), Output("5xx", "children"), Input("time", "value"), Input("svc", "value")
+    Output("4xx", "children"), Output("5xx", "children"), Output("prm-graph", "figure"), Output("errors-graph", "figure"),
+    Input("time", "value"), Input("svc", "value")
 )
 def update_kpis(time_value, svc_value):
     # Implementation for updating KPIs
     df = load(time_value, svc_value)
+    df["ts"] = df.ts.dt.tz_convert("America/Bogota")
 
+    bucket = time[time_value][2]
+    bucket_min = pd.Timedelta(bucket).total_seconds() / 60
     minutes = time[time_value][1]
+
+    rpm = df.set_index("ts").resample(bucket).size() / bucket_min
+    rpm = rpm.rename("rpm").reset_index()
+    fig_rpm = px.line(rpm, x="ts", y="rpm", title="Throughput (logs/min)")
+    end = pd.Timestamp.now(tz="America/Bogota")
+    fig_rpm.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])
+
+    errs = df[df.status_code >= 400].copy()
+    errs["tipo"] = errs.status_code.apply(lambda x: "4xx" if x < 500 else "5xx")
+    errores = errs.set_index("ts").groupby("tipo").resample(bucket).size()
+    errores = errores.rename("errores").reset_index()
+    fig_errors = px.bar(errores, x="ts", y="errores", color="tipo", title="Errores 4xx y 5xx")
+    fig_errors.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])
+
     return (
         f"{df.duration.mean():.0f}",                      
         f"{df.duration.quantile(0.95):.0f}",              
@@ -85,7 +106,9 @@ def update_kpis(time_value, svc_value):
         f"{len(df) / minutes:.1f}",                       
         f"{df.status_code.between(400, 499).sum():,}",    
         f"{df.status_code.between(500, 599).sum():,}",
-    )
+        fig_rpm,
+        fig_errors
+    )    
 
 if __name__ == "__main__":
     app.run(debug=True)
