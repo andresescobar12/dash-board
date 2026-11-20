@@ -28,6 +28,10 @@ with engine.connect() as c:
 def selector(label, child):
     return html.Div([html.Label(label), child], className="selector")
 
+def kpi(id_, label):
+    return html.Div ([html.Div(label, className="kpi-label"), 
+                      html.Div(id=id_, className="kpi-value")], className="kpi")
+
 app = Dash(__name__, title="logs")
 
 app.layout = html.Div(
@@ -40,8 +44,48 @@ app.layout = html.Div(
                 selector( "Refrescar cada", dcc.RadioItems(list(refresh), "10s", id="refresh", inline=True)),
             ],
             className="selectors",
+        ),
+        html.H3("KPIs"),
+        html.Div(
+            [
+                kpi("avg", "Promedio response time (ms)"),
+                kpi("p95", "P95 response time (ms)"),
+                kpi("p99", "P99 response time (ms)"),
+                kpi("rpm", "Throughput (logs/min)"),
+                kpi("4xx", "Errores 4xx"),
+                kpi("5xx", "Errores 5xx"),
+            ],
+            className="kpis",
         )
     ]
 )
+
+def load(time_value, svc_value):
+    sql = "SELECT ts, svc, status_code, duration FROM logs WHERE ts >= NOW() - cast(:w as interval)"
+    valores = {"w": time[time_value][0]}
+    if svc_value != all:
+        sql += " AND svc = :s"
+        valores["s"] = svc_value
+    with engine.connect() as c:
+        return pd.read_sql(text(sql), c, params=valores)
+
+@app.callback(
+    Output("avg", "children"), Output("p95", "children"), Output("p99", "children"), Output("rpm", "children"),
+    Output("4xx", "children"), Output("5xx", "children"), Input("time", "value"), Input("svc", "value")
+)
+def update_kpis(time_value, svc_value):
+    # Implementation for updating KPIs
+    df = load(time_value, svc_value)
+
+    minutes = time[time_value][1]
+    return (
+        f"{df.duration.mean():.0f}",                      
+        f"{df.duration.quantile(0.95):.0f}",              
+        f"{df.duration.quantile(0.99):.0f}",              
+        f"{len(df) / minutes:.1f}",                       
+        f"{df.status_code.between(400, 499).sum():,}",    
+        f"{df.status_code.between(500, 599).sum():,}",
+    )
+
 if __name__ == "__main__":
     app.run(debug=True)
