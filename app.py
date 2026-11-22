@@ -59,6 +59,9 @@ app.layout = html.Div(
         ),
         dcc.Graph(id="prm-graph"),
         dcc.Graph(id="errors-graph"),
+        dcc.Graph(id="rt-graph"),
+
+        dcc.Interval(id="interval", interval= 10_000),
     ]
 )
 
@@ -71,13 +74,17 @@ def load(time_value, svc_value):
     with engine.connect() as c:
         return pd.read_sql(text(sql), c, params=valores)
 
+@app.callback(Output("interval", "interval"), Input("refresh", "value"))
+def update_interval(value):
+    return refresh[value]
 
 @app.callback(
     Output("avg", "children"), Output("p95", "children"), Output("p99", "children"), Output("rpm", "children"),
     Output("4xx", "children"), Output("5xx", "children"), Output("prm-graph", "figure"), Output("errors-graph", "figure"),
-    Input("time", "value"), Input("svc", "value")
+    Output("rt-graph", "figure"),
+    Input("time", "value"), Input("svc", "value"), Input("interval", "n_intervals")
 )
-def update_kpis(time_value, svc_value):
+def update_kpis(time_value, svc_value, _):
     # Implementation for updating KPIs
     df = load(time_value, svc_value)
     df["ts"] = df.ts.dt.tz_convert("America/Bogota")
@@ -99,6 +106,12 @@ def update_kpis(time_value, svc_value):
     fig_errors = px.bar(errores, x="ts", y="errores", color="tipo", title="Errores 4xx y 5xx")
     fig_errors.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])
 
+    g = df.set_index("ts").resample(bucket).duration
+    rt = pd.DataFrame({ "promedio": g.mean(), "p95": g.quantile(0.95), "p99": g.quantile(0.99)}).reset_index()
+    rt = rt.reset_index().melt("ts", var_name="medida", value_name="ms")
+    fig_rt = px.line(rt, x="ts", y="ms", color="medida", title="Response time (ms)")
+    fig_rt.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])
+
     return (
         f"{df.duration.mean():.0f}",                      
         f"{df.duration.quantile(0.95):.0f}",              
@@ -107,7 +120,8 @@ def update_kpis(time_value, svc_value):
         f"{df.status_code.between(400, 499).sum():,}",    
         f"{df.status_code.between(500, 599).sum():,}",
         fig_rpm,
-        fig_errors
+        fig_errors,
+        fig_rt,
     )    
 
 if __name__ == "__main__":
