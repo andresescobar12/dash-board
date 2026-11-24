@@ -36,7 +36,7 @@ app = Dash(__name__, title="logs")
 
 app.layout = html.Div(
     [
-        html.H2("Logs"),
+        html.H2("Dashboard de logs", className="title"),
         html.Div(
             [
                 selector( "Servicio", dcc.Dropdown(service, all, id="svc", clearable=False)),
@@ -45,7 +45,7 @@ app.layout = html.Div(
             ],
             className="selectors",
         ),
-        html.H3("KPIs"),
+        html.H3("KPIs", className="section"),
         html.Div(
             [
                 kpi("avg", "Promedio response time (ms)"),
@@ -57,12 +57,14 @@ app.layout = html.Div(
             ],
             className="kpis",
         ),
-        dcc.Graph(id="prm-graph"),
-        dcc.Graph(id="errors-graph"),
-        dcc.Graph(id="rt-graph"),
+        html.H3("Graficas", className="section"),
+        dcc.Graph(id="prm-graph", className="graph"),
+        dcc.Graph(id="errors-graph", className="graph"),
+        dcc.Graph(id="rt-graph", className="graph"),
 
         dcc.Interval(id="interval", interval= 10_000),
-    ]
+    ],
+    className="page",
 )
 
 def load(time_value, svc_value):
@@ -87,6 +89,10 @@ def update_interval(value):
 def update_kpis(time_value, svc_value, _):
     # Implementation for updating KPIs
     df = load(time_value, svc_value)
+    if df.empty:
+        vacio = px.scatter(title="Sin datos en esta ventana")
+        return "–", "–", "–", "0", "0", "0", vacio, vacio, vacio
+
     df["ts"] = df.ts.dt.tz_convert("America/Bogota")
 
     bucket = time[time_value][2]
@@ -107,7 +113,7 @@ def update_kpis(time_value, svc_value, _):
     fig_errors.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])
 
     g = df.set_index("ts").resample(bucket).duration
-    rt = pd.DataFrame({ "promedio": g.mean(), "p95": g.quantile(0.95), "p99": g.quantile(0.99)}).reset_index()
+    rt = pd.DataFrame({ "promedio": g.mean(), "p95": g.quantile(0.95), "p99": g.quantile(0.99)})
     rt = rt.reset_index().melt("ts", var_name="medida", value_name="ms")
     fig_rt = px.line(rt, x="ts", y="ms", color="medida", title="Response time (ms)")
     fig_rt.update_xaxes(range=[end - pd.Timedelta(minutes=minutes), end])

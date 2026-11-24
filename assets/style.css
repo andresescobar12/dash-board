@@ -1,8 +1,30 @@
-body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; }
-.selectors { color: #333; display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap; }
-.selector { min-width: 200px }
-.selector label { display: block; font-size: 15px; color: #666; margin-bottom: 4px; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1f2937; }
+.page { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+/* Título principal */
+.title { margin: 0 0 1.25rem; font-size: 1.6rem; border-left: 4px solid #7f4bc4; padding-left: 0.75rem; }
+
+/* Títulos de sección (KPIs, Graficas) */
+.section { margin: 1.5rem 0 0.75rem; font-size: 13px; font-weight: 600; color: #6b7280;
+           text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Selectores */
+.selectors { display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap; background: #fff;
+             border-radius: 10px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.selector { min-width: 200px; }
+.selector > label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px; }
+.selector input[type="radio"] { accent-color: #7f4bc4; margin-right: 4px; }
+.selector > div label { margin-right: 1rem; }
+
+/* KPIs */
 .kpis { display: flex; gap: 1rem; }
 .kpi  { background: #fff; border-radius: 10px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); flex: 1; text-align: center; }
-.kpi-label { font-size: 14px; color: #6b7280; margin-bottom: 4px; }
+.kpi-label { font-size: 13px; color: #6b7280; margin-bottom: 4px; }
 .kpi-value { font-size: 24px; font-weight: bold; color: #7f4bc4; }
+.kpi:has(#\34xx) { border-top: 3px solid #f0a202; }
+.kpi:has(#\35xx) { border-top: 3px solid #d1495b; }
+
+/* Gráficas: una debajo de la otra, en tarjeta blanca */
+.graph { background: #fff; border-radius: 10px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+         margin-bottom: 1rem; height: 380px; }
